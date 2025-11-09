@@ -1,0 +1,176 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键：移动端适配（让页面在手机上不缩放） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易移动端题库</title>
+    <!-- 引入Tailwind CSS（无需下载，CDN直接用） -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 md:p-6">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-5">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">每日刷题</h1>
+
+        <!-- 答题区域 -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3" id="question-title">加载题目中...</h2>
+            <div class="space-y-3" id="options-container">
+                <!-- 选项会通过JS动态生成 -->
+            </div>
+        </div>
+
+        <!-- 结果反馈 -->
+        <div class="mb-4 text-center" id="feedback"></div>
+
+        <!-- 统计信息 -->
+        <div class="flex justify-between text-sm text-gray-600 mb-6">
+            <span>已答题：<span id="answered-count">0</span></span>
+            <span>正确率：<span id="correct-rate">0%</span></span>
+        </div>
+
+        <!-- 功能按钮 -->
+        <div class="flex gap-3">
+            <button onclick="nextQuestion()" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600">
+                下一题
+            </button>
+            <button onclick="resetRecord()" class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600">
+                重置记录
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 1. 题库数据（直接在这里添加/修改题目）
+        const questionBank = [
+            {
+                id: 1,
+                title: "以下哪种不是前端技术？",
+                options: ["HTML", "Java", "CSS", "JavaScript"],
+                answer: "Java", // 正确答案（要和options里的内容完全一致）
+                category: "前端基础"
+            },
+            {
+                id: 2,
+                title: "逻辑斯蒂回归的决策边界是什么类型？",
+                options: ["线性", "非线性", "多项式", "随机森林"],
+                answer: "线性",
+                category: "机器学习"
+            },
+            {
+                id: 3,
+                title: "LocalStorage的存储容量约为？",
+                options: ["1MB", "5MB", "10MB", "20MB"],
+                answer: "5MB",
+                category: "前端存储"
+            }
+        ];
+
+        // 2. 全局状态（当前题目、答题记录）
+        let currentIndex = 0; // 当前题目索引
+        let answeredCount = 0; // 已答题数
+        let correctCount = 0; // 答对题数
+
+        // 3. 初始化页面（加载第一题+恢复本地存储记录）
+        function init() {
+            // 从本地存储恢复记录
+            const record = JSON.parse(localStorage.getItem("questionBankRecord")) || {
+                answeredCount: 0,
+                correctCount: 0
+            };
+            answeredCount = record.answeredCount;
+            correctCount = record.correctCount;
+
+            // 更新统计显示
+            updateStats();
+            // 加载当前题目
+            loadCurrentQuestion();
+        }
+
+        // 4. 加载当前题目
+        function loadCurrentQuestion() {
+            const question = questionBank[currentIndex];
+            // 更新题目标题
+            document.getElementById("question-title").textContent = `${currentIndex + 1}. ${question.title}`;
+            // 清空选项容器
+            const optionsContainer = document.getElementById("options-container");
+            optionsContainer.innerHTML = "";
+            // 清空反馈
+            document.getElementById("feedback").innerHTML = "";
+
+            // 生成选项按钮
+            question.options.forEach(option => {
+                const optionBtn = document.createElement("button");
+                optionBtn.className = "w-full text-left p-3 border rounded-lg hover:bg-gray-50";
+                optionBtn.textContent = option;
+                // 点击选项判断答案
+                optionBtn.onclick = () => checkAnswer(option, question.answer, optionBtn);
+                optionsContainer.appendChild(optionBtn);
+            });
+        }
+
+        // 5. 检查答案
+        function checkAnswer(selectedOption, correctAnswer, optionBtn) {
+            // 禁用所有选项（防止重复点击）
+            const allOptions = document.querySelectorAll("#options-container button");
+            allOptions.forEach(btn => btn.disabled = true);
+
+            // 判断对错
+            if (selectedOption === correctAnswer) {
+                optionBtn.classList.remove("border");
+                optionBtn.classList.add("bg-green-100", "text-green-800", "border-green-500");
+                document.getElementById("feedback").innerHTML = '<span class="text-green-600 font-medium">✅ 回答正确！</span>';
+                correctCount++;
+            } else {
+                optionBtn.classList.remove("border");
+                optionBtn.classList.add("bg-red-100", "text-red-800", "border-red-500");
+                // 高亮正确答案
+                allOptions.forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.remove("border");
+                        btn.classList.add("bg-green-100", "text-green-800", "border-green-500");
+                    }
+                });
+                document.getElementById("feedback").innerHTML = `<span class="text-red-600 font-medium">❌ 回答错误！正确答案是：${correctAnswer}</span>`;
+            }
+
+            // 更新答题记录
+            answeredCount++;
+            updateStats();
+            // 保存记录到本地存储
+            saveRecord();
+        }
+
+        // 6. 下一题
+        function nextQuestion() {
+            currentIndex = (currentIndex + 1) % questionBank.length;
+            loadCurrentQuestion();
+        }
+
+        // 7. 重置答题记录
+        function resetRecord() {
+            answeredCount = 0;
+            correctCount = 0;
+            updateStats();
+            saveRecord();
+            alert("答题记录已重置！");
+        }
+
+        // 8. 更新统计信息
+        function updateStats() {
+            document.getElementById("answered-count").textContent = answeredCount;
+            const rate = answeredCount === 0 ? 0 : Math.round((correctCount / answeredCount) * 100);
+            document.getElementById("correct-rate").textContent = `${rate}%`;
+        }
+
+        // 9. 保存记录到本地存储
+        function saveRecord() {
+            const record = { answeredCount, correctCount };
+            localStorage.setItem("questionBankRecord", JSON.stringify(record));
+        }
+
+        // 页面加载完成后初始化
+        window.onload = init;
+    </script>
+</body>
+</html>
